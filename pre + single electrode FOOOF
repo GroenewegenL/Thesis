@@ -1,0 +1,60 @@
+%load file
+ALLEEG = pop_loadbv('/Users/LysanneGroenewegen1/STUDIE/RM/Jaar 2/THESIS/MATLAB/OneDrive_1_1-3-2022/','ANL_aaaaaaeb_3.vhdr')
+
+%remove non channels
+ALLEEG = pop_select(ALLEEG, 'nochannel',{'P0','P1','P2'});
+   
+%remove bad channels
+ALLEEG = pop_clean_rawdata(ALLEEG, 'FlatlineCriterion',5,'ChannelCriterion',0.8,'LineNoiseCriterion',4,'Highpass',[0.25 0.75] ,'BurstCriterion','off','WindowCriterion','off','BurstRejection','off','Distance','Euclidian');
+
+%Pick the average reference electrode in this step 
+ALLEEG = pop_reref( ALLEEG, [],'interpchan',[]);
+
+%set the basic filter 1 - 40 
+ALLEEG = pop_eegfiltnew(ALLEEG, 'locutoff',1,'hicutoff',40,'plotfreqz',1);
+ALLEEG = eeg_checkset( ALLEEG );
+
+%Run the first ICA with default settings
+ALLEEG = pop_runica(ALLEEG, 'icatype', 'runica', 'extended',1,'pca',-1,'interrupt','on');
+
+%remove more bad components automatically 
+ALLEEG = pop_iclabel(ALLEEG, 'default');
+ALLEEG = pop_icflag(ALLEEG, [NaN NaN;0.9 1;0.9 1;NaN NaN;NaN NaN;NaN NaN;NaN NaN]);
+ALLEEG = pop_subcomp( ALLEEG, [12], 0);
+
+%look at the data, scroll data and spectral plots 
+ALLEEG = eeg_checkset( ALLEEG );
+     pop_eegplot( ALLEEG, 0, 1, 1);
+     figure; pop_spectopo(ALLEEG, 0, [0  3698679], 'EEG' , 'freq', [10], 'plotchan', 0, 'percent', 20, 'icacomps', [1:67], 'nicamaps', 5, 'freqrange',[2 25],'electrodes','off');
+
+%Remove bad channels more strictly 
+ALLEEG = pop_clean_rawdata(ALLEEG, 'FlatlineCriterion','off','ChannelCriterion','off','LineNoiseCriterion','off','Highpass','off','BurstCriterion',20,'WindowCriterion',0.25,'BurstRejection','on','Distance','Euclidian','WindowCriterionTolerances',[-Inf 7] );
+     ALLEEG = eeg_checkset( ALLEEG );
+     pop_eegplot( ALLEEG, 1, 1, 1);
+
+%END OF PREPROCESSING
+--------------------------------------------------------------
+%check set
+pop_eegplot( ALLEEG, 1, 1, 1);
+
+%Bin the data in minutes
+BinnedEEG = discretize(ALLEEG,'minutes')
+
+%check electrode locations 
+chanlocs = struct('labels', { 'cz' 'c3' 'c4' 'pz' 'p3' 'p4' 'fz' 'f3' 'f4'});
+pop_chanedit( chanlocs );  
+
+
+s_rate = 1000
+%FOOOF every electrode
+ALLelectrodes = {ALLEEG.data(1,:),ALLEEG.data(2,:),ALLEEG.data(3,:),ALLEEG.data(4,:),ALLEEG.data(5,:),ALLEEG.data(6,:),ALLEEG.data(7,:),ALLEEG.data(8,:),ALLEEG.data(9,:),ALLEEG.data(10,:),ALLEEG.data(11,:),ALLEEG.data(12,:),ALLEEG.data(13,:),ALLEEG.data(14,:),ALLEEG.data(15,:),ALLEEG.data(16,:),ALLEEG.data(17,:),ALLEEG.data(18,:),ALLEEG.data(19,:),ALLEEG.data(20,:),ALLEEG.data(21,:),ALLEEG.data(22,:),ALLEEG.data(23,:),ALLEEG.data(24,:),ALLEEG.data(25,:),ALLEEG.data(26,:),ALLEEG.data(27,:),ALLEEG.data(28,:),ALLEEG.data(29,:),ALLEEG.data(30,:),ALLEEG.data(31,:),ALLEEG.data(32,:),ALLEEG.data(33,:),ALLEEG.data(34,:),ALLEEG.data(35,:),ALLEEG.data(36,:),ALLEEG.data(37,:),ALLEEG.data(38,:),ALLEEG.data(39,:),ALLEEG.data(40,:),ALLEEG.data(41,:),ALLEEG.data(42,:),ALLEEG.data(43,:),ALLEEG.data(44,:),ALLEEG.data(45,:),ALLEEG.data(46,:),ALLEEG.data(47,:),ALLEEG.data(48,:),ALLEEG.data(49,:),ALLEEG.data(50,:),ALLEEG.data(51,:),ALLEEG.data(52,:),ALLEEG.data(53,:),ALLEEG.data(54,:),ALLEEG.data(55,:),ALLEEG.data(56,:),ALLEEG.data(57,:),ALLEEG.data(58,:),ALLEEG.data(59,:),ALLEEG.data(60,:),ALLEEG.data(61,:),ALLEEG.data(62,:)}
+for f = 1:length(ALLelectrodes)
+    [psd, freqs] = pwelch(ALLelectrodes{f}, 1000, [], [], s_rate);
+    freqs = freqs';
+    psd = psd';
+    settings = struct();  % Use defaults
+    f_range = [1, 60];
+    fooof_results{f} = fooof(freqs, psd, f_range, settings, true)
+    fooof_plot(fooof_results{f})
+    title(sprintf('ALLelectrodes%d',f))
+end
